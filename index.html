@@ -57,12 +57,12 @@
     <!-- TABS -->
     <div class="max-w-[1600px] mx-auto mt-2 pt-2 border-t border-slate-200/90 flex items-center justify-between gap-2 overflow-x-auto">
       <nav class="flex items-center gap-1.5 sm:gap-2">
-        <button type="button" onclick="switchDiseaseTab('stroke')" data-dis-tab="stroke" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white whitespace-nowrap">Stroke <span id="tabCountStroke">-</span></button>
-        <button type="button" onclick="switchDiseaseTab('stemi')" data-dis-tab="stemi" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 whitespace-nowrap">STEMI <span id="tabCountStemi">-</span></button>
-        <button type="button" onclick="switchDiseaseTab('sepsis')" data-dis-tab="sepsis" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 whitespace-nowrap">Sepsis <span id="tabCountSepsis">-</span></button>
-        <button type="button" onclick="switchDiseaseTab('trauma')" data-dis-tab="trauma" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 whitespace-nowrap">Trauma <span id="tabCountTrauma">-</span></button>
-        <button type="button" onclick="switchDiseaseTab('ohca')" data-dis-tab="ohca" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 whitespace-nowrap">OHCA <span id="tabCountOhca">-</span></button>
-        <button type="button" onclick="switchDiseaseTab('overview')" data-dis-tab="overview" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 whitespace-nowrap">ภาพรวม <span id="tabCountAll">-</span></button>
+        <button type="button" onclick="switchDiseaseTab('stroke')" data-dis-tab="stroke" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white whitespace-nowrap">Stroke Fast Track <span id="tabCountStroke" class="px-1.5 py-0.2 rounded-md bg-white/20 text-white text-[10px] num-font">-</span></button>
+        <button type="button" onclick="switchDiseaseTab('stemi')" data-dis-tab="stemi" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 whitespace-nowrap">STEMI Fast Track <span id="tabCountStemi" class="px-1.5 py-0.2 rounded-md bg-slate-200 text-slate-700 text-[10px] num-font">-</span></button>
+        <button type="button" onclick="switchDiseaseTab('sepsis')" data-dis-tab="sepsis" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 whitespace-nowrap">Sepsis Fast Track <span id="tabCountSepsis" class="px-1.5 py-0.2 rounded-md bg-slate-200 text-slate-700 text-[10px] num-font">-</span></button>
+        <button type="button" onclick="switchDiseaseTab('trauma')" data-dis-tab="trauma" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 whitespace-nowrap">Trauma Fast Track <span id="tabCountTrauma" class="px-1.5 py-0.2 rounded-md bg-slate-200 text-slate-700 text-[10px] num-font">-</span></button>
+        <button type="button" onclick="switchDiseaseTab('ohca')" data-dis-tab="ohca" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 whitespace-nowrap">OHCA <span id="tabCountOhca" class="px-1.5 py-0.2 rounded-md bg-slate-200 text-slate-700 text-[10px] num-font">-</span></button>
+        <button type="button" onclick="switchDiseaseTab('overview')" data-dis-tab="overview" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 whitespace-nowrap">ภาพรวม 5 ระบบ <span id="tabCountAll" class="px-1.5 py-0.2 rounded-md bg-slate-200 text-slate-700 text-[10px] num-font">-</span></button>
       </nav>
     </div>
   </header>
@@ -199,6 +199,12 @@
 
   </main>
 
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-2xl shadow-xl text-xs font-semibold flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+    <span id="toastMsg">แจ้งเตือน</span>
+  </div>
+
   <script>
     const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzLZZ9vj7acrY0EmqFNVDpDHVrYfQZuq2lOtdLQUkt51t1RguGhVfFI9qSpRU0cprWJ/exec';
 
@@ -211,15 +217,30 @@
     const charts = {};
     function destroyChart(key) { if (charts[key]) { charts[key].destroy(); delete charts[key]; } }
     const pct = (num, den) => den > 0 ? (num / den) * 100 : 0;
-    const avg = arr => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-
+    
     function setVal(id, text) {
       const el = document.getElementById(id);
       if (el) el.textContent = text;
     }
 
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      const m = document.getElementById('toastMsg');
+      if (t && m) {
+        m.textContent = msg;
+        t.classList.remove('translate-y-20', 'opacity-0');
+        clearTimeout(window._toastTimer);
+        window._toastTimer = setTimeout(() => {
+          t.classList.add('translate-y-20', 'opacity-0');
+        }, 3000);
+      }
+    }
+
     async function syncFromGoogleSheet(showNotification = false) {
-      setVal('syncStatusLabel', 'กำลังโหลดข้อมูล...');
+      setVal('syncStatusLabel', 'กำลัง Sync...');
+      const statusDot = document.getElementById('syncStatusDot');
+      if (statusDot) statusDot.className = 'w-1.5 h-1.5 rounded-full bg-amber-500 live-dot';
+
       try {
         const fetchSheet = async (sheetName) => {
           const res = await fetch(`${WEB_APP_URL}?sheet=${encodeURIComponent(sheetName)}`);
@@ -248,10 +269,14 @@
         setVal('tabCountAll', state.data.stroke.length + state.data.stemi.length + state.data.sepsis.length + state.data.trauma.length + state.data.ohca.length);
 
         setVal('syncStatusLabel', 'Connected');
+        if (statusDot) statusDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 live-dot';
+        
         renderDiseaseTab(state.currentTab);
-        if (showNotification) alert('Sync สำเร็จ!');
+        if (showNotification) showToast('Sync ข้อมูลสำเร็จ!');
       } catch (err) {
-        setVal('syncStatusLabel', 'Sync Error');
+        setVal('syncStatusLabel', 'Sync ผิดพลาด');
+        if (statusDot) statusDot.className = 'w-1.5 h-1.5 rounded-full bg-rose-500 live-dot';
+        if (showNotification) showToast('เกิดข้อผิดพลาดในการโหลดข้อมูล');
         console.error(err);
       }
     }
