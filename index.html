@@ -1,0 +1,1434 @@
+﻿<!DOCTYPE html>
+<html lang="th" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fast Track Clinical Dashboard - โรงพยาบาลนครปฐม</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'IBM Plex Sans Thai', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .num-font {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-feature-settings: "tnum";
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .live-dot {
+      animation: pulseDot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .4; transform: scale(1.2); }
+    }
+  </style>
+</head>
+<body class="min-h-full flex flex-col text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- TOP EXECUTIVE APP BAR -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-xs px-3 sm:px-6 py-2.5">
+    <div class="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-3">
+      <!-- Hospital Logo & Cockpit Identity -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 via-indigo-600 to-blue-600 flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="text-sm sm:text-base font-bold tracking-tight text-slate-900 uppercase">FAST TRACK CLINICAL DASHBOARD</h1>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span id="syncStatusDot" class="w-1.5 h-1.5 rounded-full bg-emerald-500 live-dot"></span>
+              <span id="syncStatusLabel">Google Sheet Connected</span>
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-500">
+            ระบบรายงานตัวชี้วัด หน่วยปฏิบัติการแพทย์ รพ.นครปฐม | <span id="activePeriodBadge" class="text-indigo-600 font-semibold">ปีงบฯ 2569 (ต.ค. 68 – ก.ย. 69)</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="flex items-center flex-wrap gap-2">
+        <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
+          <svg class="w-3.5 h-3.5 text-indigo-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          <select id="periodSelect" onchange="setPeriodFilter(this.value)" class="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer">
+            <option value="ALL">ทั้งปีงบฯ 2569 (ต.ค. 68 – ก.ย. 69)</option>
+            <option value="Q1">ไตรมาส 1 (ต.ค. – ธ.ค. 2568)</option>
+            <option value="Q2">ไตรมาส 2 (ม.ค. – มี.ค. 2569)</option>
+            <option value="Q3">ไตรมาส 3 (เม.ย. – มิ.ย. 2569)</option>
+            <option value="Q4">ไตรมาส 4 (ก.ค. – ก.ย. 2569)</option>
+            <option value="H1">ครึ่งปีแรก H1 (ต.ค. 68 – มี.ค. 69)</option>
+            <option value="H2">ครึ่งปีหลัง H2 (เม.ย. 69 – ก.ย. 69)</option>
+            <option value="M_0">เดือน ตุลาคม 2568</option>
+            <option value="M_1">เดือน พฤศจิกายน 2568</option>
+            <option value="M_2">เดือน ธันวาคม 2568</option>
+            <option value="M_3">เดือน มกราคม 2569</option>
+            <option value="M_4">เดือน กุมภาพันธ์ 2569</option>
+            <option value="M_5">เดือน มีนาคม 2569</option>
+            <option value="M_6">เดือน เมษายน 2569</option>
+            <option value="M_7">เดือน พฤษภาคม 2569</option>
+            <option value="M_8">เดือน มิถุนายน 2569</option>
+            <option value="M_9">เดือน กรกฎาคม 2569</option>
+            <option value="M_10">เดือน สิงหาคม 2569</option>
+            <option value="M_11">เดือน กันยายน 2569</option>
+          </select>
+        </div>
+
+        <div class="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200" role="group">
+          <button id="btnViewPC" type="button" onclick="setViewportMode('pc')" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all bg-white text-indigo-700 shadow-xs border border-slate-200/80">
+            <span>PC</span>
+          </button>
+          <button id="btnViewMobile" type="button" onclick="setViewportMode('mobile')" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-600 hover:text-slate-900">
+            <span>มือถือ</span>
+          </button>
+        </div>
+
+        <button id="btnLiveSync" type="button" onclick="syncFromGoogleSheet(true)" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1.5 transition">
+          <span class="hidden sm:inline">Sync จาก Sheet</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- PRIMARY DISEASE TABS NAVIGATION -->
+    <div class="max-w-[1600px] mx-auto mt-2 pt-2 border-t border-slate-200/90 flex items-center justify-between gap-2 overflow-x-auto">
+      <nav class="flex items-center gap-1.5 sm:gap-2">
+        <button type="button" onclick="switchDiseaseTab('stroke')" data-dis-tab="stroke" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-indigo-600 text-white shadow-xs whitespace-nowrap">
+          <span class="w-2 h-2 rounded-full bg-sky-300"></span>
+          <span>Stroke Fast Track</span>
+          <span id="tabCountStroke" class="px-1.5 py-0.2 rounded-md bg-white/20 text-white text-[10px] num-font">-</span>
+        </button>
+        <button type="button" onclick="switchDiseaseTab('stemi')" data-dis-tab="stemi" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent whitespace-nowrap">
+          <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+          <span>STEMI Fast Track</span>
+          <span id="tabCountStemi" class="px-1.5 py-0.2 rounded-md bg-slate-200 text-slate-700 text-[10px] num-font">-</span>
+        </button>
+        <button type="button" onclick="switchDiseaseTab('sepsis')" data-dis-tab="sepsis" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent whitespace-nowrap">
+          <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+          <span>Sepsis Fast Track</span>
+          <span id="tabCountSepsis" class="px-1.5 py-0.2 rounded-md bg-slate-200 text-slate-700 text-[10px] num-font">-</span>
+        </button>
+        <button type="button" onclick="switchDiseaseTab('trauma')" data-dis-tab="trauma" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent whitespace-nowrap">
+          <span class="w-2 h-2 rounded-full bg-orange-500"></span>
+          <span>Trauma Fast Track</span>
+          <span id="tabCountTrauma" class="px-1.5 py-0.2 rounded-md bg-slate-200 text-slate-700 text-[10px] num-font">-</span>
+        </button>
+        <button type="button" onclick="switchDiseaseTab('ohca')" data-dis-tab="ohca" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent whitespace-nowrap">
+          <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+          <span>OHCA (หัวใจหยุดเต้นนอก รพ.)</span>
+          <span id="tabCountOhca" class="px-1.5 py-0.2 rounded-md bg-slate-200 text-slate-700 text-[10px] num-font">-</span>
+        </button>
+        <button type="button" onclick="switchDiseaseTab('overview')" data-dis-tab="overview" class="dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent whitespace-nowrap">
+          <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+          <span>ภาพรวม 5 ระบบ</span>
+          <span id="tabCountAll" class="px-1.5 py-0.2 rounded-md bg-slate-200 text-slate-700 text-[10px] num-font">-</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- MAIN VIEWPORT CONTAINER -->
+  <main id="mainViewport" class="flex-1 max-w-[1600px] w-full mx-auto p-3 sm:p-6 space-y-6 transition-all duration-300">
+
+    <!-- ========================================== -->
+    <!-- TAB 1: STROKE FAST TRACK -->
+    <!-- ========================================== -->
+    <div id="tabContentStroke" class="space-y-6">
+      <div class="bg-gradient-to-r from-sky-50 via-white to-blue-50 border border-sky-200 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 text-[11px] font-bold">STROKE COCKPIT</span>
+            <h2 class="text-base sm:text-lg font-bold text-slate-900">ตัวชี้วัดและผลการรักษาผู้ป่วยโรคหลอดเลือดสมองเฉียบพลัน</h2>
+          </div>
+          <p class="text-xs text-slate-600">เวลาทำ CT Scan และให้ยาสลายลิ่มเลือด rt-PA</p>
+        </div>
+        <div class="flex items-center gap-3 shrink-0">
+          <div class="bg-white border border-sky-200 rounded-xl px-4 py-2 text-center shadow-xs">
+            <span class="text-[10px] text-slate-500 font-semibold block">ผู้ป่วยที่ได้รับ rt-PA</span>
+            <span id="strokeRtpaCount" class="text-lg font-bold text-sky-700 num-font">-</span>
+            <span id="strokeRtpaPct" class="text-[10px] text-slate-500 block">-</span>
+          </div>
+          <div class="bg-white border border-sky-200 rounded-xl px-4 py-2 text-center shadow-xs">
+            <span class="text-[10px] text-slate-500 font-semibold block">ผู้ป่วยที่ทำ EVT</span>
+            <span id="strokeEvtCount" class="text-lg font-bold text-indigo-700 num-font">-</span>
+            <span id="strokeEvtPct" class="text-[10px] text-slate-500 block">-</span>
+          </div>
+          <div class="bg-white border border-sky-200 rounded-xl px-4 py-2 text-center shadow-xs">
+            <span class="text-[10px] text-slate-500 font-semibold block">DTN เฉลี่ย</span>
+            <span id="strokeRtpaMeanDtn" class="text-lg font-bold text-emerald-700 num-font">-</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+        <!-- KPI 1 -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span class="font-semibold text-sky-700">KPI 1</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">เป้าหมาย ≥ 10%</span>
+            </div>
+            <h3 class="text-xs font-bold text-slate-800 line-clamp-2">Stroke Fast Track เข้าถึงระบบ EMS</h3>
+            <div class="mt-2 flex items-baseline gap-2">
+              <span id="strokeKpi1Val" class="text-2xl font-black text-slate-900 num-font">-</span>
+              <span class="text-xs font-semibold text-slate-500">%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI 2 -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span class="font-semibold text-sky-700">KPI 2</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">เป้าหมาย ≥ 90%</span>
+            </div>
+            <h3 class="text-xs font-bold text-slate-800 line-clamp-2">Activate Stroke Fast Track</h3>
+            <div class="mt-2 flex items-baseline gap-2">
+              <span id="strokeKpi2Val" class="text-2xl font-black text-slate-900 num-font">-</span>
+              <span id="strokeKpi2Ratio" class="text-[11px] font-semibold text-slate-500">-</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-1">เปิด Fast Track EMS สอดคล้องกับ ER</p>
+          </div>
+          <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+            <span class="text-[10px] text-slate-400">คำนวณจาก Activate EMS ต่อ ER</span>
+          </div>
+        </div>
+
+        <!-- KPI 3 -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between opacity-80">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span class="font-semibold text-slate-400">KPI 3</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">เป้าหมาย ≥ 90%</span>
+            </div>
+            <h3 class="text-xs font-bold text-slate-600 line-clamp-2">CPG Compliance</h3>
+            <div class="mt-2 flex items-baseline gap-2">
+              <span class="text-2xl font-black text-slate-400 num-font">-</span>
+              <span class="text-xs font-semibold text-slate-400">%</span>
+            </div>
+          </div>
+          <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+            <span class="text-[10px] text-slate-400">เว้นไว้</span>
+          </div>
+        </div>
+
+        <!-- KPI 4 -->
+        <div class="bg-white rounded-2xl p-4 border border-sky-200 shadow-xs flex flex-col justify-between ring-1 ring-sky-100">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span class="font-semibold text-sky-700">KPI 4</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">เป้าหมาย ≥ 90%</span>
+            </div>
+            <h3 class="text-xs font-bold text-slate-800 line-clamp-2">Door to CT ภายใน 25 นาที</h3>
+            <div class="mt-2 flex items-baseline gap-2">
+              <span id="strokeDctPctBadge" class="text-2xl font-black text-sky-700 num-font">-</span>
+              <span id="strokeDctRatioBadge" class="text-[11px] font-semibold text-slate-500">-</span>
+            </div>
+          </div>
+          <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+            <span class="text-[10px] text-slate-400">เฉลี่ย <b id="strokeMeanDctVal" class="text-slate-700 num-font">-</b> นาที</span>
+          </div>
+        </div>
+
+        <!-- KPI 5 -->
+        <div class="bg-white rounded-2xl p-4 border border-emerald-200 shadow-xs flex flex-col justify-between ring-1 ring-emerald-100">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span class="font-semibold text-emerald-700">KPI 5</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">เป้าหมาย ≥ 85%</span>
+            </div>
+            <h3 class="text-xs font-bold text-slate-800 line-clamp-2">Door to Needle ภายใน 60 นาที</h3>
+            <div class="mt-2 flex items-baseline gap-2">
+              <span id="strokeDtnPctBadge" class="text-2xl font-black text-emerald-700 num-font">-</span>
+              <span id="strokeDtnRatioBadge" class="text-[11px] font-semibold text-slate-500">-</span>
+            </div>
+          </div>
+          <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+            <span class="text-[10px] text-slate-400">เฉลี่ย <b id="strokeMeanDtnVal" class="text-slate-700 num-font">-</b> นาที</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs lg:col-span-2">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">แนวโน้ม Door to CT (≤ 25 นาที) และ Door to Needle (≤ 60 นาที) รายเดือน</h3>
+            </div>
+          </div>
+          <div class="h-64 sm:h-72">
+            <canvas id="chartStrokeMonthly"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-sm font-bold text-slate-900">สัดส่วนการเปิดหลอดเลือดสมอง (Reperfusion Therapy)</h3>
+            </div>
+            <div class="h-48 relative flex items-center justify-center">
+              <canvas id="chartStrokeReperf"></canvas>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-center text-xs">
+            <div class="bg-sky-50 p-2 rounded-xl border border-sky-100">
+              <span class="text-slate-500 block text-[11px]">ได้รับยา rt-PA</span>
+              <b id="chartStrokeRtpa" class="text-sky-700 text-sm num-font">-</b>
+            </div>
+            <div class="bg-indigo-50 p-2 rounded-xl border border-indigo-100">
+              <span class="text-slate-500 block text-[11px]">ทำ EVT</span>
+              <b id="chartStrokeEvt" class="text-indigo-700 text-sm num-font">-</b>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- TAB 2: STEMI FAST TRACK -->
+    <!-- ========================================== -->
+    <div id="tabContentStemi" class="space-y-6 hidden">
+      <div class="bg-gradient-to-r from-rose-50 via-white to-orange-50 border border-rose-200 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 text-[11px] font-bold">STEMI COCKPIT</span>
+            <h2 class="text-base sm:text-lg font-bold text-slate-900">ตัวชี้วัดและผลการรักษาผู้ป่วยกล้ามเนื้อหัวใจขาดเลือดเฉียบพลัน</h2>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 shrink-0">
+          <div class="bg-white border border-rose-200 rounded-xl px-4 py-2 text-center shadow-xs">
+            <span class="text-[10px] text-slate-500 font-semibold block">ผู้ป่วยที่ทำ Primary PCI</span>
+            <span id="stemiPciCount" class="text-lg font-bold text-rose-700 num-font">-</span>
+            <span id="stemiPciPct" class="text-[10px] text-slate-500 block">-</span>
+          </div>
+          <div class="bg-white border border-rose-200 rounded-xl px-4 py-2 text-center shadow-xs">
+            <span class="text-[10px] text-slate-500 font-semibold block">ผู้ป่วยที่ได้รับ SK</span>
+            <span id="stemiSkCount" class="text-lg font-bold text-amber-700 num-font">-</span>
+            <span id="stemiSkPct" class="text-[10px] text-slate-500 block">-</span>
+          </div>
+          <div class="bg-white border border-rose-200 rounded-xl px-4 py-2 text-center shadow-xs">
+            <span class="text-[10px] text-slate-500 font-semibold block">เปิดหลอดเลือดสำเร็จ</span>
+            <span id="stemiTotalReperfCount" class="text-lg font-bold text-emerald-700 num-font">-</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <!-- KPI 1 -->
+        <div class="bg-white rounded-2xl p-5 border border-rose-200 shadow-xs flex flex-col justify-between ring-1 ring-rose-100">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span class="font-semibold text-rose-700">KPI 1</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-800 border border-rose-200">เป้าหมาย ≥ 90%</span>
+            </div>
+            <h3 class="text-sm font-bold text-slate-800">FMC to EKG ภายใน 10 นาที</h3>
+            <div class="mt-3 flex items-baseline gap-2">
+              <span id="stemiKpi1Val" class="text-3xl font-black text-rose-700 num-font">-</span>
+              <span id="stemiKpi1Ratio" class="text-xs font-semibold text-slate-500">-</span>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span class="text-slate-400">เฉลี่ย <b id="stemiMeanEkgVal" class="text-slate-700 num-font">-</b> นาที</span>
+          </div>
+        </div>
+
+        <!-- KPI 2 -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span class="font-semibold text-rose-700">KPI 2</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">เป้าหมาย ≥ 90%</span>
+            </div>
+            <h3 class="text-sm font-bold text-slate-800">Activate STEMI Fast Track</h3>
+            <div class="mt-3 flex items-baseline gap-2">
+              <span id="stemiKpi2Val" class="text-3xl font-black text-slate-900 num-font">-</span>
+              <span id="stemiKpi2Ratio" class="text-xs font-semibold text-slate-500">-</span>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span class="text-slate-400">คำนวณจาก Activate EMS ต่อ ER</span>
+          </div>
+        </div>
+
+        <!-- KPI 3 -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between opacity-80">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span class="font-semibold text-slate-400">KPI 3</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">เป้าหมาย ≥ 90%</span>
+            </div>
+            <h3 class="text-sm font-bold text-slate-600">CPG Compliance</h3>
+            <div class="mt-3 flex items-baseline gap-2">
+              <span class="text-3xl font-black text-slate-400 num-font">-</span>
+              <span class="text-xs font-semibold text-slate-400">%</span>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span class="text-[11px] text-slate-400">เว้นไว้</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs lg:col-span-2">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">ผลการทำหัตถการเปิดหลอดเลือดหัวใจ (Primary PCI vs Streptokinase) รายเดือน</h3>
+            </div>
+          </div>
+          <div class="h-64 sm:h-72">
+            <canvas id="chartStemiReperf"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 mb-2">สัดส่วนวิธีการเปิดหลอดเลือดหัวใจ</h3>
+            <div class="h-48 relative flex items-center justify-center">
+              <canvas id="chartStemiPie"></canvas>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 text-center text-xs text-slate-500">
+             <span id="chartStemiSubtext">-</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- TAB 3: SEPSIS FAST TRACK -->
+    <!-- ========================================== -->
+    <div id="tabContentSepsis" class="space-y-6 hidden">
+      <div class="bg-gradient-to-r from-amber-50 via-white to-yellow-50 border border-amber-200 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[11px] font-bold">SEPSIS COCKPIT</span>
+            <h2 class="text-base sm:text-lg font-bold text-slate-900">ตัวชี้วัดและผลการรักษาภาวะติดเชื้อในกระแสเลือด (Sepsis Fast Track)</h2>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 shrink-0">
+          <div class="bg-white border border-amber-200 rounded-xl px-4 py-2 text-center shadow-xs">
+            <span class="text-[10px] text-slate-500 font-semibold block">ผ่านเกณฑ์ ATB ≤ 60 นาที</span>
+            <span id="sepsisLe60Count" class="text-lg font-bold text-emerald-700 num-font">-</span>
+          </div>
+          <div class="bg-white border border-amber-200 rounded-xl px-4 py-2 text-center shadow-xs">
+            <span class="text-[10px] text-slate-500 font-semibold block">ให้ ATB เร็ว ≤ 30 นาที</span>
+            <span id="sepsisLe30Count" class="text-lg font-bold text-indigo-700 num-font">-</span>
+          </div>
+          <div class="bg-white border border-amber-200 rounded-xl px-4 py-2 text-center shadow-xs">
+            <span class="text-[10px] text-slate-500 font-semibold block">เวลาให้ยา ATB เฉลี่ย</span>
+            <span id="sepsisMeanAtb" class="text-lg font-bold text-amber-700 num-font">-</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <!-- KPI 1 -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span class="font-semibold text-amber-700">KPI 1</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">เป้าหมาย ≥ 90%</span>
+            </div>
+            <h3 class="text-sm font-bold text-slate-800">CPG Compliance</h3>
+            <div class="mt-3 flex items-baseline gap-2">
+              <span id="sepsisKpi1Val" class="text-3xl font-black text-slate-900 num-font">-</span>
+              <span id="sepsisKpi1Ratio" class="text-xs font-semibold text-slate-500">-</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">การปฏิบัติตามแนวทางการดูแลรักษาผู้ป่วยติดเชื้อในกระแสเลือดครบถ้วน</p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span id="sepsisKpi1Total" class="text-slate-400">ประเมินผล - ราย</span>
+          </div>
+        </div>
+
+        <!-- KPI 2 -->
+        <div class="bg-white rounded-2xl p-5 border border-emerald-200 shadow-xs flex flex-col justify-between ring-1 ring-emerald-100">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span class="font-semibold text-emerald-700">KPI 2</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">เป้าหมาย ≥ 80%</span>
+            </div>
+            <h3 class="text-sm font-bold text-slate-800">Diagnosis to Antibiotic ภายใน 60 นาที</h3>
+            <div class="mt-3 flex items-baseline gap-2">
+              <span id="sepsisKpi2Val" class="text-3xl font-black text-emerald-700 num-font">-</span>
+              <span id="sepsisKpi2Ratio" class="text-xs font-semibold text-slate-500">-</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">เวลาตั้งแต่แพทย์วินิจฉัยจนกระทั่งเริ่มให้ยาปฏิชีวนะทางหลอดเลือดดำ</p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span class="text-slate-400">เฉลี่ย <b id="sepsisMeanAtbVal" class="text-slate-700 num-font">-</b> นาที</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs lg:col-span-2">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">แนวโน้มการให้ยาปฏิชีวนะ (Dx to ATB ≤ 60 นาที) รายเดือน</h3>
+            </div>
+          </div>
+          <div class="h-64 sm:h-72">
+            <canvas id="chartSepsisMonthly"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 mb-2">ช่วงเวลาการให้ยาปฏิชีวนะ (ATB Time Interval)</h3>
+            <div class="h-48 relative flex items-center justify-center">
+              <canvas id="chartSepsisBins"></canvas>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-center text-xs">
+            <div class="bg-emerald-50 p-2 rounded-xl border border-emerald-100">
+              <span class="text-slate-500 block text-[11px]">เร็วมาก ≤ 30 นาที</span>
+              <b id="chartSepsisLe30" class="text-emerald-700 num-font">-</b>
+            </div>
+            <div class="bg-amber-50 p-2 rounded-xl border border-amber-100">
+              <span class="text-slate-500 block text-[11px]">31 - 60 นาที</span>
+              <b id="chartSepsisLe60" class="text-amber-700 num-font">-</b>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- TAB 4: TRAUMA FAST TRACK -->
+    <!-- ========================================== -->
+    <div id="tabContentTrauma" class="space-y-6 hidden">
+      <div class="bg-gradient-to-r from-orange-50 via-white to-amber-50 border border-orange-200 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded-md bg-orange-100 text-orange-800 text-[11px] font-bold">TRAUMA COCKPIT</span>
+            <h2 class="text-base sm:text-lg font-bold text-slate-900">ตัวชี้วัดและผลการดูแลผู้ป่วยอุบัติเหตุรุนแรง (Trauma Fast Track)</h2>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 shrink-0 flex-wrap">
+          <div class="bg-white border border-rose-200 rounded-xl px-3.5 py-2 text-center shadow-xs">
+            <span class="text-[10px] text-rose-600 font-bold block">ระดับแดง (วิกฤต)</span>
+            <span id="traumaTriageRedCount" class="text-lg font-bold text-rose-700 num-font">-</span>
+            <span id="traumaTriageRedPct" class="text-[10px] text-rose-500 block font-semibold">-</span>
+          </div>
+          <div class="bg-white border border-amber-200 rounded-xl px-3.5 py-2 text-center shadow-xs">
+            <span class="text-[10px] text-amber-600 font-bold block">ระดับเหลือง (เร่งด่วน)</span>
+            <span id="traumaTriageYellowCount" class="text-lg font-bold text-amber-700 num-font">-</span>
+            <span id="traumaTriageYellowPct" class="text-[10px] text-amber-600 block font-semibold">-</span>
+          </div>
+          <div class="bg-white border border-emerald-200 rounded-xl px-3.5 py-2 text-center shadow-xs">
+            <span class="text-[10px] text-emerald-600 font-bold block">ระดับเขียว (ไม่ด่วน)</span>
+            <span id="traumaTriageGreenCount" class="text-lg font-bold text-emerald-700 num-font">-</span>
+            <span id="traumaTriageGreenPct" class="text-[10px] text-emerald-600 block font-semibold">-</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- KPI 1 -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span class="font-semibold text-orange-700">KPI 1</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-50 text-orange-800 border border-orange-200">เป้าหมาย ≥ 90%</span>
+            </div>
+            <h3 class="text-sm font-bold text-slate-800">Activate Trauma Fast Track</h3>
+            <div class="mt-3 flex items-baseline gap-2">
+              <span id="traumaKpi1Val" class="text-3xl font-black text-slate-900 num-font">-</span>
+              <span id="traumaKpi1Ratio" class="text-xs font-semibold text-slate-500"></span>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">การเปิดระบบ Fast Track โดยทีมกู้ชีพ EMS ณ จุดเกิดเหตุ</p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span class="text-slate-400">คำนวณจากเคส Activate EMS ต่อ เคสทั้งหมด</span>
+          </div>
+        </div>
+
+        <!-- KPI 2 -->
+        <div class="bg-white rounded-2xl p-5 border border-orange-200 shadow-xs flex flex-col justify-between ring-1 ring-orange-100">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span class="font-semibold text-orange-700">KPI 2</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-50 text-orange-800 border border-orange-200">เป้าหมาย ≥ 90%</span>
+            </div>
+            <h3 class="text-sm font-bold text-slate-800">ช่วยเหลือ ณ จุดเกิดเหตุ ภายใน 15 นาที</h3>
+            <div class="mt-3 flex items-baseline gap-2">
+              <span id="traumaKpi2Val" class="text-3xl font-black text-orange-700 num-font">-</span>
+              <span id="traumaKpi2Ratio" class="text-xs font-semibold text-slate-500"></span>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">ระยะเวลา On Scene Time ตั้งแต่ถึงจุดเกิดเหตุจนกระทั่งเคลื่อนย้าย</p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span class="text-slate-400">เฉลี่ย <b id="traumaMeanSceneTimeVal" class="text-slate-700 num-font">-</b> นาที</span>
+          </div>
+        </div>
+
+        <!-- Triage Summary Card -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span class="font-semibold text-indigo-600">TRIAGE ACUITY</span>
+            </div>
+            <h3 class="text-sm font-bold text-slate-800">ระดับความรุนแรง ณ จุดเกิดเหตุ</h3>
+            <div class="mt-3 space-y-1.5 text-xs">
+              <div class="flex items-center justify-between">
+                <span class="inline-flex items-center gap-1.5 font-bold text-rose-700">
+                  <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> แดง (วิกฤต)
+                </span>
+                <b id="cardTriageRed" class="num-font text-slate-900">-</b>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="inline-flex items-center gap-1.5 font-bold text-amber-700">
+                  <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> เหลือง (เร่งด่วน)
+                </span>
+                <b id="cardTriageYellow" class="num-font text-slate-900">-</b>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="inline-flex items-center gap-1.5 font-bold text-emerald-700">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> เขียว (ไม่ด่วน)
+                </span>
+                <b id="cardTriageGreen" class="num-font text-slate-900">-</b>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Highlight Card: Clinical Outcomes -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span class="font-semibold text-emerald-600">OUTCOMES</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">ผลการรักษา</span>
+            </div>
+            <h3 class="text-sm font-bold text-slate-800">อัตราจำหน่ายปลอดภัย (D/C)</h3>
+            <div class="mt-3 flex items-baseline gap-2">
+              <span id="traumaDcRate" class="text-3xl font-black text-emerald-700 num-font">-</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">ผู้ป่วยพ้นภาวะวิกฤตและจำหน่ายกลับบ้านปลอดภัย</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trauma Visual Charts Section -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs lg:col-span-2">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">แนวโน้ม On Scene Time ≤ 15 นาที และการเปิด Fast Track รายเดือน</h3>
+            </div>
+          </div>
+          <div class="h-64 sm:h-72">
+            <canvas id="chartTraumaMonthly"></canvas>
+          </div>
+        </div>
+
+        <!-- Triage Level Doughnut Chart -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 mb-2">สัดส่วนระดับความรุนแรงผู้ป่วยบาดเจ็บ (Triage Acuity)</h3>
+            <div class="h-48 relative flex items-center justify-center">
+              <canvas id="chartTraumaTriagePie"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- กราฟแนวโน้มคัดแยกความรุนแรงรายเดือน (Trauma Triage Trend) -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs mt-5">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">แนวโน้มผู้ป่วยอุบัติเหตุแยกตามระดับความรุนแรงรายเดือน (Triage Trend)</h3>
+          </div>
+        </div>
+        <div class="h-64 sm:h-72">
+          <canvas id="chartTraumaTriageMonthly"></canvas>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- TAB 5: OHCA -->
+    <!-- ========================================== -->
+    <div id="tabContentOhca" class="space-y-6 hidden">
+      <div class="bg-gradient-to-r from-purple-50 via-white to-fuchsia-50 border border-purple-200 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[11px] font-bold">OHCA COCKPIT</span>
+            <h2 class="text-base sm:text-lg font-bold text-slate-900">ตัวชี้วัดผู้ป่วยหัวใจหยุดเต้นนอกโรงพยาบาล</h2>
+          </div>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- KPI 1 -->
+        <div class="bg-white rounded-2xl p-5 border border-purple-200 shadow-xs flex flex-col justify-between ring-1 ring-purple-100">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span class="font-semibold text-purple-700">KPI 1</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-800 border border-purple-200">เป้าหมาย ≥ 80%</span>
+            </div>
+            <h3 class="text-sm font-bold text-slate-800">Time to First Shock ≤ 2 นาที (VF/VT)</h3>
+            <div class="mt-3 flex items-baseline gap-2">
+              <span id="ohcaKpi1Val" class="text-3xl font-black text-purple-700 num-font">-</span>
+              <span id="ohcaKpi1Ratio" class="text-xs font-semibold text-slate-500">-</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI 2 -->
+        <div class="bg-white rounded-2xl p-5 border border-emerald-200 shadow-xs flex flex-col justify-between ring-1 ring-emerald-100">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span class="font-semibold text-emerald-700">KPI 2</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">เป้าหมาย ≥ 30%</span>
+            </div>
+            <h3 class="text-sm font-bold text-slate-800">อัตราความสำเร็จ ROSC ของทีม EMS</h3>
+            <div class="mt-3 flex items-baseline gap-2">
+              <span id="ohcaKpi2Val" class="text-3xl font-black text-emerald-700 num-font">-</span>
+              <span id="ohcaKpi2Ratio" class="text-xs font-semibold text-slate-500">-</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI 3 -->
+        <div class="bg-white rounded-2xl p-5 border border-indigo-200 shadow-xs flex flex-col justify-between ring-1 ring-indigo-100">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span class="font-semibold text-indigo-700">KPI 3</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">เป้าหมาย ≥ 20%</span>
+            </div>
+            <h3 class="text-sm font-bold text-slate-800">Survival to Admit</h3>
+            <div class="mt-3 flex items-baseline gap-2">
+              <span id="ohcaKpi3Val" class="text-3xl font-black text-indigo-700 num-font">-</span>
+              <span id="ohcaKpi3Ratio" class="text-xs font-semibold text-slate-500">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs lg:col-span-2">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">อัตราความสำเร็จ ROSC ของทีม EMS รายเดือน</h3>
+            </div>
+          </div>
+          <div class="h-64 sm:h-72">
+            <canvas id="chartOhcaMonthly"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB 6: ภาพรวม 5 ระบบ (OVERVIEW) -->
+    <!-- ========================================== -->
+    <div id="tabContentOverview" class="space-y-6 hidden">
+      <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-5 sm:p-6 shadow-md flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+        <div class="space-y-1.5 max-w-2xl">
+          <h2 class="text-lg sm:text-xl font-bold tracking-tight text-white">ผลการดำเนินงานตัวชี้วัด Fast Track</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-3 w-full lg:w-auto shrink-0">
+          <div class="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10 text-center">
+            <span class="text-[11px] text-slate-300 block">ผู้ป่วย Fast Track รวม</span>
+            <span id="ovTotalPatients" class="text-2xl font-black text-white num-font">-</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">ปริมาณผู้ป่วยแยกตามระบบบริการ Fast Track</h3>
+            </div>
+          </div>
+          <div class="h-64 sm:h-72">
+            <canvas id="chartOverviewVolume"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">แนวโน้มจำนวนผู้ป่วยรับบริการรายเดือน (Monthly Inflow Trend)</h3>
+            </div>
+          </div>
+          <div class="h-64 sm:h-72">
+            <canvas id="chartOverviewMonthly"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-2xl shadow-xl text-xs font-semibold flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+    <span id="toastMsg">แจ้งเตือน</span>
+  </div>
+
+  <script>
+    // Constants and state
+    const MONTHS_SHORT = ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.'];
+    const PERIOD_LABELS = {
+      ALL: 'ปีงบฯ 2569', Q1: 'ไตรมาส 1', Q2: 'ไตรมาส 2', Q3: 'ไตรมาส 3', Q4: 'ไตรมาส 4',
+      M_0: 'ต.ค.', M_1: 'พ.ย.', M_2: 'ธ.ค.', M_3: 'ม.ค.', M_4: 'ก.พ.', M_5: 'มี.ค.',
+      M_6: 'เม.ย.', M_7: 'พ.ค.', M_8: 'มิ.ย.', M_9: 'ก.ค.', M_10: 'ส.ค.', M_11: 'ก.ย.'
+    };
+
+    const state = {
+      currentTab: 'stroke',
+      periodFilter: 'ALL',
+      data: { stroke: [], stemi: [], sepsis: [], trauma: [], ohca: [] }
+    };
+
+    // Store Chart instances so we can destroy them before redrawing
+    const charts = {};
+
+    function destroyChart(key) {
+      if (charts[key]) {
+        charts[key].destroy();
+        delete charts[key];
+      }
+    }
+
+    // Helper functions for math
+    const pct = (num, den) => den > 0 ? (num / den) * 100 : 0;
+    const avg = arr => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+
+    function getActiveMonthIndices(periodKey) {
+      if (periodKey === 'Q1') return ['ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+      if (periodKey === 'Q2') return ['มกราคม', 'กุมภาพันธ์', 'มีนาคม'];
+      if (periodKey === 'Q3') return ['เมษายน', 'พฤษภาคม', 'มิถุนายน'];
+      if (periodKey === 'Q4') return ['กรกฎาคม', 'สิงหาคม', 'กันยายน'];
+      if (periodKey.startsWith('M_')) {
+        const mList = ['ตุลาคม', 'พฤศจิกายน', 'ธันวาคม', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน'];
+        return [mList[parseInt(periodKey.split('_')[1], 10)]];
+      }
+      return null; // ALL
+    }
+
+    function computeMetricsForMonths(activeMonthsStr) {
+      // Filter datasets based on selected months
+      const filterData = (dataset) => {
+        if (!activeMonthsStr) return dataset;
+        return dataset.filter(r => r['เดือน'] && activeMonthsStr.includes(r['เดือน'].trim()));
+      };
+
+      const strokeRecs = filterData(state.data.stroke);
+      const stemiRecs = filterData(state.data.stemi);
+      const sepsisRecs = filterData(state.data.sepsis);
+      const traumaRecs = filterData(state.data.trauma);
+      const ohcaRecs = filterData(state.data.ohca);
+
+      // --- STROKE ---
+      const sRtpa = strokeRecs.filter(r => String(r['rT-PA']).toUpperCase() === 'TRUE').length;
+      const sEvt = strokeRecs.filter(r => String(r['MT']).toUpperCase() === 'TRUE').length;
+      const sActEms = strokeRecs.filter(r => String(r['Activate FT (EMS)']).toUpperCase() === 'TRUE').length;
+      const sActEr = strokeRecs.filter(r => String(r['Fast tract (ER)']).toUpperCase() === 'TRUE').length;
+      const sColNArr = strokeRecs.map(r => parseFloat(r['เวลา CT'])).filter(v => !isNaN(v));
+      const sColNLe25 = sColNArr.filter(v => v <= 25).length;
+      const sColQArr = strokeRecs.map(r => parseFloat(r['DTN'])).filter(v => !isNaN(v));
+      const sColQLe60 = sColQArr.filter(v => v <= 60).length;
+
+      // --- STEMI ---
+      const stActEms = stemiRecs.filter(r => String(r['Activate (EMS)']).toUpperCase() === 'TRUE').length;
+      const stActEr = stemiRecs.filter(r => String(r['STEMI (ER)']).toUpperCase() === 'TRUE').length;
+      const stColKArr = stemiRecs.map(r => parseFloat(r['นาที'])).filter(v => !isNaN(v));
+      const stColKLe10 = stColKArr.filter(v => v <= 10).length;
+      const stPci = stemiRecs.filter(r => r['PCI Time'] && r['PCI Time'].trim() !== '').length;
+      const stSk = stemiRecs.filter(r => r['SK Time'] && r['SK Time'].trim() !== '').length;
+
+      // --- SEPSIS ---
+      const spAtbArr = sepsisRecs.map(r => parseFloat(r['DX-ATB นาที'])).filter(v => !isNaN(v));
+      const spAtbLe60 = spAtbArr.filter(v => v <= 60).length;
+      const spAtbLe30 = spAtbArr.filter(v => v <= 30).length;
+      const spCpgPass = sepsisRecs.filter(r => String(r['Sepsis CPG compliance']).toUpperCase() === 'TRUE').length;
+
+      // --- TRAUMA ---
+      const tActEms = traumaRecs.filter(r => String(r['Activate FT (EMS)']).toUpperCase() === 'TRUE').length;
+      const tActEr = traumaRecs.filter(r => String(r['Fast tract (ER)']).toUpperCase() === 'TRUE').length;
+      const tSceneArr = traumaRecs.map(r => parseFloat(r['scene time 10 min'])).filter(v => !isNaN(v));
+      const tSceneLe15 = tSceneArr.filter(v => v <= 15).length;
+      const tDc = traumaRecs.filter(r => String(r['D/C']).toUpperCase() === 'TRUE').length;
+      
+      const tRed = traumaRecs.filter(r => r['level']?.trim() === 'แดง').length;
+      const tYellow = traumaRecs.filter(r => r['level']?.trim() === 'เหลือง').length;
+      const tGreen = traumaRecs.filter(r => r['level']?.trim() === 'เขียว').length;
+      const tTriageTotal = tRed + tYellow + tGreen;
+
+      // --- OHCA ---
+      const oShockable = ohcaRecs.filter(r => r['[merged] First  Rhythm'] === 'VF' || r['[merged] First  Rhythm'] === 'VT').length;
+      const oShockLe2 = ohcaRecs.filter(r => String(r['[merged] First Shock ...']).toUpperCase() === 'Y').length;
+      const oRosc = ohcaRecs.filter(r => String(r['[merged]     ROSC rate ']).toUpperCase() === 'TRUE').length;
+      const oSurvAdmit = ohcaRecs.filter(r => String(r['[merged] Survival to ...']).toUpperCase() === 'TRUE').length;
+
+      return {
+        stroke: {
+          total: strokeRecs.length,
+          sRtpa, sEvt,
+          sActEms, sActEr, kpi2Actual: pct(sActEms, sActEr),
+          rtpaPct: pct(sRtpa, strokeRecs.length),
+          evtPct: pct(sEvt, strokeRecs.length),
+          sColNLe25, sColNLen: sColNArr.length,
+          kpi4Actual: pct(sColNLe25, sColNArr.length),
+          meanDct: avg(sColNArr),
+          sColQLe60, sColQLen: sColQArr.length,
+          kpi5Actual: pct(sColQLe60, sColQArr.length),
+          meanDtn: avg(sColQArr)
+        },
+        stemi: {
+          total: stemiRecs.length,
+          stActEms, stActEr, kpi2Actual: pct(stActEms, stActEr),
+          stColKLe10, stColKLen: stColKArr.length,
+          kpi1Actual: pct(stColKLe10, stColKArr.length),
+          meanEkg: avg(stColKArr),
+          stSk, stPci,
+          skPct: pct(stSk, stemiRecs.length),
+          pciPct: pct(stPci, stemiRecs.length),
+          reperfPct: pct(stSk + stPci, stemiRecs.length)
+        },
+        sepsis: {
+          total: sepsisRecs.length,
+          spAtbLe60, spAtbLen: spAtbArr.length, spAtbLe30,
+          spCpgPass, kpi1Actual: pct(spCpgPass, sepsisRecs.length),
+          kpi2Actual: pct(spAtbLe60, spAtbArr.length),
+          meanAtb: avg(spAtbArr)
+        },
+        trauma: {
+          total: traumaRecs.length,
+          tActEms, tActEr,
+          kpi1Actual: pct(tActEms, traumaRecs.length),
+          tSceneLe15, tSceneLen: tSceneArr.length,
+          kpi2Actual: pct(tSceneLe15, tSceneArr.length),
+          meanScene: avg(tSceneArr),
+          tRed, tYellow, tGreen, tTriageTotal,
+          redPct: pct(tRed, tTriageTotal),
+          yellowPct: pct(tYellow, tTriageTotal),
+          greenPct: pct(tGreen, tTriageTotal),
+          dcPct: pct(tDc, traumaRecs.length)
+        },
+        ohca: {
+          total: ohcaRecs.length,
+          oShockable, oShockLe2,
+          kpi1Actual: pct(oShockLe2, oShockable),
+          oRosc,
+          kpi2Actual: pct(oRosc, ohcaRecs.length),
+          oSurvAdmit,
+          kpi3Actual: pct(oSurvAdmit, ohcaRecs.length)
+        }
+      };
+    }
+
+    function renderDiseaseTab(tabKey) {
+      const activeMonthsStr = getActiveMonthIndices(state.periodFilter);
+      const m = computeMetricsForMonths(activeMonthsStr);
+      
+      const mList = ['ตุลาคม', 'พฤศจิกายน', 'ธันวาคม', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน'];
+      const monthsToChart = activeMonthsStr || mList;
+      
+      const mStatsArray = monthsToChart.map(month => ({
+         label: MONTHS_SHORT[mList.indexOf(month)],
+         stats: computeMetricsForMonths([month])
+      }));
+      const labels = mStatsArray.map(x => x.label);
+
+      if (tabKey === 'stroke') {
+        const s = m.stroke;
+        document.getElementById('strokeRtpaCount').textContent = s.sRtpa;
+        document.getElementById('strokeRtpaPct').textContent = s.rtpaPct.toFixed(1) + '%';
+        document.getElementById('strokeRtpaMeanDtn').textContent = s.meanDtn.toFixed(1) + ' นาที';
+        document.getElementById('strokeEvtCount').textContent = s.sEvt;
+        document.getElementById('strokeEvtPct').textContent = s.evtPct.toFixed(1) + '%';
+
+        document.getElementById('strokeKpi2Val').textContent = s.kpi2Actual.toFixed(2) + '%';
+        document.getElementById('strokeKpi2Ratio').textContent = `(${s.sActEms} / ${s.sActEr} ราย)`;
+
+        document.getElementById('strokeDctPctBadge').textContent = s.kpi4Actual.toFixed(2) + '%';
+        document.getElementById('strokeDctRatioBadge').textContent = `(${s.sColNLe25} / ${s.sColNLen})`;
+        document.getElementById('strokeMeanDctVal').textContent = s.meanDct.toFixed(1);
+
+        document.getElementById('strokeDtnPctBadge').textContent = s.kpi5Actual.toFixed(2) + '%';
+        document.getElementById('strokeDtnRatioBadge').textContent = `(${s.sColQLe60} / ${s.sColQLen})`;
+        document.getElementById('strokeMeanDtnVal').textContent = s.meanDtn.toFixed(1);
+
+        document.getElementById('chartStrokeRtpa').textContent = `${s.sRtpa} ราย (${s.rtpaPct.toFixed(1)}%)`;
+        document.getElementById('chartStrokeEvt').textContent = `${s.sEvt} ราย (${s.evtPct.toFixed(1)}%)`;
+
+        renderStrokeCharts(labels, mStatsArray, s);
+      }
+      else if (tabKey === 'stemi') {
+        const st = m.stemi;
+        document.getElementById('stemiPciCount').textContent = st.stPci;
+        document.getElementById('stemiPciPct').textContent = st.pciPct.toFixed(1) + '%';
+        document.getElementById('stemiSkCount').textContent = st.stSk;
+        document.getElementById('stemiSkPct').textContent = st.skPct.toFixed(1) + '%';
+        document.getElementById('stemiTotalReperfCount').textContent = `${st.stSk + st.stPci} / ${st.total}`;
+
+        document.getElementById('stemiKpi1Val').textContent = st.kpi1Actual.toFixed(2) + '%';
+        document.getElementById('stemiKpi1Ratio').textContent = `(${st.stColKLe10} / ${st.stColKLen} ราย)`;
+        document.getElementById('stemiMeanEkgVal').textContent = st.meanEkg.toFixed(1);
+
+        document.getElementById('stemiKpi2Val').textContent = st.kpi2Actual.toFixed(2) + '%';
+        document.getElementById('stemiKpi2Ratio').textContent = `(${st.stActEms} / ${st.stActEr} ราย)`;
+
+        document.getElementById('chartStemiSubtext').textContent = `Primary PCI ${st.stPci} ราย (${st.pciPct.toFixed(1)}%) | ให้ยา SK ${st.stSk} ราย (${st.skPct.toFixed(1)}%)`;
+
+        renderStemiCharts(labels, mStatsArray, st);
+      }
+      else if (tabKey === 'sepsis') {
+        const sp = m.sepsis;
+        document.getElementById('sepsisMeanAtb').textContent = sp.meanAtb.toFixed(1) + ' นาที';
+        
+        document.getElementById('sepsisKpi1Val').textContent = sp.kpi1Actual.toFixed(2) + '%';
+        document.getElementById('sepsisKpi1Ratio').textContent = `(${sp.spCpgPass} / ${sp.total} ราย)`;
+        document.getElementById('sepsisKpi1Total').textContent = `ประเมินผล ${sp.total} ราย`;
+
+        document.getElementById('sepsisKpi2Val').textContent = sp.kpi2Actual.toFixed(2) + '%';
+        document.getElementById('sepsisKpi2Ratio').textContent = `(${sp.spAtbLe60} / ${sp.spAtbLen} ราย)`;
+        document.getElementById('sepsisMeanAtbVal').textContent = sp.meanAtb.toFixed(1);
+
+        const le30Pct = sp.spAtbLen > 0 ? (sp.spAtbLe30 / sp.spAtbLen * 100) : 0;
+        const between31_60 = sp.spAtbLe60 - sp.spAtbLe30;
+        const between31_60Pct = sp.spAtbLen > 0 ? (between31_60 / sp.spAtbLen * 100) : 0;
+
+        document.getElementById('sepsisLe60Count').textContent = sp.spAtbLe60;
+        document.getElementById('sepsisLe30Count').textContent = sp.spAtbLe30;
+
+        document.getElementById('chartSepsisLe30').textContent = `${sp.spAtbLe30} ราย (${le30Pct.toFixed(1)}%)`;
+        document.getElementById('chartSepsisLe60').textContent = `${between31_60} ราย (${between31_60Pct.toFixed(1)}%)`;
+
+        renderSepsisCharts(labels, mStatsArray, sp);
+      }
+      else if (tabKey === 'trauma') {
+        const t = m.trauma;
+        document.getElementById('traumaKpi1Val').textContent = t.kpi1Actual.toFixed(2) + '%';
+        document.getElementById('traumaKpi1Ratio').textContent = `(${t.tActEms} / ${t.total} ราย)`;
+
+        document.getElementById('traumaKpi2Val').textContent = t.kpi2Actual.toFixed(2) + '%';
+        document.getElementById('traumaKpi2Ratio').textContent = `(${t.tSceneLe15} / ${t.tSceneLen} ราย)`;
+        document.getElementById('traumaMeanSceneTimeVal').textContent = t.meanScene.toFixed(1);
+        
+        document.getElementById('traumaDcRate').textContent = t.dcPct.toFixed(2) + '%';
+
+        // Triage numbers
+        document.getElementById('traumaTriageRedCount').textContent = t.tRed;
+        document.getElementById('traumaTriageRedPct').textContent = `(${t.redPct.toFixed(1)}%)`;
+        document.getElementById('traumaTriageYellowCount').textContent = t.tYellow;
+        document.getElementById('traumaTriageYellowPct').textContent = `(${t.yellowPct.toFixed(1)}%)`;
+        document.getElementById('traumaTriageGreenCount').textContent = t.tGreen;
+        document.getElementById('traumaTriageGreenPct').textContent = `(${t.greenPct.toFixed(1)}%)`;
+        
+        document.getElementById('cardTriageRed').textContent = `${t.tRed} ราย (${t.redPct.toFixed(1)}%)`;
+        document.getElementById('cardTriageYellow').textContent = `${t.tYellow} ราย (${t.yellowPct.toFixed(1)}%)`;
+        document.getElementById('cardTriageGreen').textContent = `${t.tGreen} ราย (${t.greenPct.toFixed(1)}%)`;
+
+        renderTraumaCharts(labels, mStatsArray, t);
+      }
+      else if (tabKey === 'ohca') {
+         const o = m.ohca;
+         document.getElementById('ohcaShockCount').textContent = `${o.oShockLe2} / ${o.oShockable}`;
+         document.getElementById('ohcaRoscCount').textContent = `${o.oRosc} / ${o.total}`;
+         document.getElementById('ohcaSurvCount').textContent = `${o.oSurvAdmit} / ${o.total}`;
+
+         document.getElementById('ohcaKpi1Val').textContent = o.kpi1Actual.toFixed(2) + '%';
+         document.getElementById('ohcaKpi1Ratio').textContent = `(${o.oShockLe2} / ${o.oShockable} ราย)`;
+
+         document.getElementById('ohcaKpi2Val').textContent = o.kpi2Actual.toFixed(2) + '%';
+         document.getElementById('ohcaKpi2Ratio').textContent = `(${o.oRosc} / ${o.total} ราย)`;
+
+         document.getElementById('ohcaKpi3Val').textContent = o.kpi3Actual.toFixed(2) + '%';
+         document.getElementById('ohcaKpi3Ratio').textContent = `(${o.oSurvAdmit} / ${o.total} ราย)`;
+
+         renderOhcaCharts(labels, mStatsArray, o);
+      }
+      else if (tabKey === 'overview') {
+        document.getElementById('ovTotalPatients').textContent = (m.stroke.total + m.stemi.total + m.sepsis.total + m.trauma.total + m.ohca.total).toLocaleString();
+        renderOverviewCharts(labels, mStatsArray, m);
+      }
+    }
+
+    function switchDiseaseTab(tabKey) {
+      state.currentTab = tabKey;
+      const tabIds = {
+        stroke: 'tabContentStroke',
+        stemi: 'tabContentStemi',
+        sepsis: 'tabContentSepsis',
+        trauma: 'tabContentTrauma',
+        ohca: 'tabContentOhca',
+        overview: 'tabContentOverview'
+      };
+
+      Object.entries(tabIds).forEach(([k, elId]) => {
+        const el = document.getElementById(elId);
+        if (el) {
+          if (k === tabKey) el.classList.remove('hidden');
+          else el.classList.add('hidden');
+        }
+      });
+
+      document.querySelectorAll('.dis-tab-btn').forEach(btn => {
+        const isAct = btn.getAttribute('data-dis-tab') === tabKey;
+        if (isAct) {
+          btn.className = 'dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-indigo-600 text-white shadow-xs whitespace-nowrap';
+        } else {
+          btn.className = 'dis-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent whitespace-nowrap';
+        }
+      });
+
+      renderDiseaseTab(tabKey);
+    }
+
+    function setPeriodFilter(val) {
+      state.periodFilter = val;
+      document.getElementById('activePeriodBadge').textContent = PERIOD_LABELS[val] || 'ปีงบฯ 2569';
+      renderDiseaseTab(state.currentTab);
+      showToast(`เปลี่ยนช่วงเวลา: ${PERIOD_LABELS[val] || val}`);
+    }
+
+    // Chart Rendering Functions
+    function renderStrokeCharts(labels, mStats, s) {
+      destroyChart('strokeMonthly');
+      destroyChart('strokeReperf');
+      const ctxM = document.getElementById('chartStrokeMonthly').getContext('2d');
+      charts['strokeMonthly'] = new Chart(ctxM, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Door to CT ≤ 25 นาที (%)',
+              data: mStats.map(x => x.stats.stroke.kpi4Actual),
+              backgroundColor: 'rgba(14, 165, 233, 0.75)',
+              borderRadius: 6
+            },
+            {
+              label: 'Door to Needle ≤ 60 นาที (%)',
+              data: mStats.map(x => x.stats.stroke.kpi5Actual),
+              backgroundColor: 'rgba(16, 185, 129, 0.75)',
+              borderRadius: 6
+            }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: { y: { min: 0, max: 100 } }
+        }
+      });
+
+      const ctxR = document.getElementById('chartStrokeReperf').getContext('2d');
+      charts['strokeReperf'] = new Chart(ctxR, {
+        type: 'doughnut',
+        data: {
+          labels: ['ได้รับยาละลายลิ่มเลือด rt-PA', 'ทำหัตถการลากลิ่มเลือด EVT', 'การรักษาประคับประคอง'],
+          datasets: [{
+            data: [s.sRtpa, s.sEvt, Math.max(0, s.total - s.sRtpa - s.sEvt)],
+            backgroundColor: ['#0284c7', '#6366f1', '#e2e8f0'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } }
+          },
+          cutout: '68%'
+        }
+      });
+    }
+
+    function renderStemiCharts(labels, mStats, st) {
+      destroyChart('stemiReperf');
+      destroyChart('stemiPie');
+      const ctxM = document.getElementById('chartStemiReperf').getContext('2d');
+      charts['stemiReperf'] = new Chart(ctxM, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'ทำหัตถการ Primary PCI',
+              data: mStats.map(x => x.stats.stemi.stPci),
+              backgroundColor: '#e11d48',
+              borderRadius: 6
+            },
+            {
+              label: 'ให้ยา Streptokinase (SK)',
+              data: mStats.map(x => x.stats.stemi.stSk),
+              backgroundColor: '#f59e0b',
+              borderRadius: 6
+            }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      const ctxP = document.getElementById('chartStemiPie').getContext('2d');
+      charts['stemiPie'] = new Chart(ctxP, {
+        type: 'doughnut',
+        data: {
+          labels: ['Primary PCI', 'Streptokinase SK', 'อื่นๆ'],
+          datasets: [{
+            data: [st.stPci, st.stSk, Math.max(0, st.total - (st.stSk + st.stPci))],
+            backgroundColor: ['#e11d48', '#f59e0b', '#cbd5e1'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+          cutout: '68%'
+        }
+      });
+    }
+
+    function renderSepsisCharts(labels, mStats, sp) {
+      destroyChart('sepsisMonthly');
+      destroyChart('sepsisBins');
+      
+      const ctxM = document.getElementById('chartSepsisMonthly').getContext('2d');
+      charts['sepsisMonthly'] = new Chart(ctxM, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Dx to ATB ≤ 60 นาที (%)',
+              data: mStats.map(x => x.stats.sepsis.kpi2Actual),
+              backgroundColor: 'rgba(16, 185, 129, 0.75)',
+              borderRadius: 6
+            }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100 } } }
+      });
+
+      const ctxB = document.getElementById('chartSepsisBins').getContext('2d');
+      charts['sepsisBins'] = new Chart(ctxB, {
+        type: 'doughnut',
+        data: {
+          labels: ['≤ 30 นาที', '31 - 60 นาที', '> 60 นาที'],
+          datasets: [{
+            data: [sp.spAtbLe30, Math.max(0, sp.spAtbLe60 - sp.spAtbLe30), Math.max(0, sp.spAtbLen - sp.spAtbLe60)],
+            backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+          cutout: '68%'
+        }
+      });
+    }
+
+    function renderTraumaCharts(labels, mStats, t) {
+      destroyChart('traumaMonthly');
+      destroyChart('traumaTriagePie');
+      destroyChart('traumaTriageMonthly');
+
+      const ctxM = document.getElementById('chartTraumaMonthly').getContext('2d');
+      charts['traumaMonthly'] = new Chart(ctxM, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'On Scene Time ≤ 15 นาที (%)',
+              data: mStats.map(x => x.stats.trauma.kpi2Actual),
+              backgroundColor: 'rgba(249, 115, 22, 0.75)',
+              borderRadius: 6
+            }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100 } } }
+      });
+
+      const ctxT = document.getElementById('chartTraumaTriagePie').getContext('2d');
+      charts['traumaTriagePie'] = new Chart(ctxT, {
+        type: 'doughnut',
+        data: {
+          labels: [
+            `ระดับแดง วิกฤต (${t.tRed} ราย)`,
+            `ระดับเหลือง เร่งด่วน (${t.tYellow} ราย)`,
+            `ระดับเขียว ไม่ด่วน (${t.tGreen} ราย)`
+          ],
+          datasets: [{
+            data: [t.tRed, t.tYellow, t.tGreen],
+            backgroundColor: ['#ef4444', '#f59e0b', '#10b981'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { position: 'bottom' } } }
+      });
+
+      const ctxTriageM = document.getElementById('chartTraumaTriageMonthly').getContext('2d');
+      charts['traumaTriageMonthly'] = new Chart(ctxTriageM, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'ระดับแดง (วิกฤต)',
+              data: mStats.map(x => x.stats.trauma.tRed),
+              borderColor: '#ef4444',
+              backgroundColor: '#ef4444',
+              tension: 0.3,
+              pointRadius: 4
+            },
+            {
+              label: 'ระดับเหลือง (เร่งด่วน)',
+              data: mStats.map(x => x.stats.trauma.tYellow),
+              borderColor: '#f59e0b',
+              backgroundColor: '#f59e0b',
+              tension: 0.3,
+              pointRadius: 4
+            },
+            {
+              label: 'ระดับเขียว (ไม่ด่วน)',
+              data: mStats.map(x => x.stats.trauma.tGreen),
+              borderColor: '#10b981',
+              backgroundColor: '#10b981',
+              tension: 0.3,
+              pointRadius: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
+          scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+        }
+      });
+    }
+
+    function renderOhcaCharts(labels, mStats, o) {
+      destroyChart('ohcaMonthly');
+      const ctxM = document.getElementById('chartOhcaMonthly').getContext('2d');
+      charts['ohcaMonthly'] = new Chart(ctxM, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'อัตราความสำเร็จ ROSC ของทีม EMS (%)',
+              data: mStats.map(x => x.stats.ohca.kpi2Actual),
+              backgroundColor: 'rgba(16, 185, 129, 0.75)',
+              borderRadius: 6
+            }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100 } } }
+      });
+    }
+
+    function renderOverviewCharts(labels, mStats, metrics) {
+      destroyChart('overviewVolume');
+      const ctxV = document.getElementById('chartOverviewVolume').getContext('2d');
+      charts['overviewVolume'] = new Chart(ctxV, {
+        type: 'bar',
+        data: {
+          labels: ['Stroke', 'STEMI', 'Sepsis', 'Trauma FT', 'OHCA'],
+          datasets: [{
+            data: [metrics.stroke.total, metrics.stemi.total, metrics.sepsis.total, metrics.trauma.total, metrics.ohca.total],
+            backgroundColor: ['#0284c7', '#e11d48', '#f59e0b', '#ea580c', '#9333ea'],
+            borderRadius: 8
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+      });
+    }
+
+   // Google Sheets Data Fetching
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwZ7_qGzLMsymBeDUv9tJBYFBXuJQrIaO8es-YcuaNxUw71NSEosURJbNLjb3YtEnEp/exec';
+
+async function syncFromGoogleSheet(showNotification) {
+  const statusLabel = document.getElementById('syncStatusLabel');
+  const statusDot = document.getElementById('syncStatusDot');
+  statusLabel.textContent = 'กำลัง Sync จาก Script...';
+  statusDot.className = 'w-1.5 h-1.5 rounded-full bg-amber-500 live-dot';
+
+  try {
+    // ฟังก์ชันช่วยดึงข้อมูลทีละ Sheet ผ่าน Web App
+    const fetchSheet = async (sheetName) => {
+      const res = await fetch(`${WEB_APP_URL}?sheet=${encodeURIComponent(sheetName)}`);
+      return await res.json();
+    };
+
+    // ดึงข้อมูลแต่ละชีทพร้อมกัน
+    const [strokeData, stemiData, sepsisData, traumaData, ohcaData] = await Promise.all([
+      fetchSheet('stroke'),
+      fetchSheet('stemi'),
+      fetchSheet('sepsis'),
+      fetchSheet('Trauma FT'),
+      fetchSheet('OHCA')
+    ]);
+
+    // นำข้อมูลไปเก็บใน state ของระบบ
+    state.data.stroke = strokeData;
+    state.data.stemi = stemiData;
+    state.data.sepsis = sepsisData;
+    state.data.trauma = traumaData;
+    state.data.ohca = ohcaData;
+    
+    // อัปเดตตัวเลขหน้าจอ
+    document.getElementById('tabCountStroke').textContent = strokeData.length;
+    document.getElementById('tabCountStemi').textContent = stemiData.length;
+    document.getElementById('tabCountSepsis').textContent = sepsisData.length;
+    document.getElementById('tabCountTrauma').textContent = traumaData.length;
+    document.getElementById('tabCountOhca').textContent = ohcaData.length;
+    document.getElementById('tabCountAll').textContent = strokeData.length + stemiData.length + sepsisData.length + traumaData.length + ohcaData.length;
+
+    const nowStr = new Date().toLocaleTimeString('th-TH');
+    statusLabel.textContent = `Sync สำเร็จ (${nowStr})`;
+    statusDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 live-dot';
+    
+    renderDiseaseTab(state.currentTab);
+    if (showNotification) showToast('Sync ข้อมูลผ่าน Apps Script สำเร็จ!');
+
+  } catch (e) {
+    statusLabel.textContent = `Sync ผิดพลาด`;
+    statusDot.className = 'w-1.5 h-1.5 rounded-full bg-rose-500 live-dot';
+    if (showNotification) showToast('เกิดข้อผิดพลาดในการโหลดข้อมูล');
+    console.error(e);
+  }
+}
+  </script>
+</body>
+</html>
